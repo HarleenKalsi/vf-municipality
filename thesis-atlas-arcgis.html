@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thesis Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script type="module" src="https://js.arcgis.com/5.2/embeddable-components/"></script>
+<style>
+/* Layout concept: a cartographic front door. Large map with neatline, graticule, legend and scale; research panel beside it, stacked on phones. */
+:root {
+  --bg: #EDF0EE;
+  --surface: #FBFCFB;
+  --land: #E9EDE6;
+  --lake: #BFD6E4;
+  --lake-ink: #3F6B80;
+  --ink: #14232B;
+  --muted: #55676F;
+  --line: #CBD4D1;
+  --road: #8A9BA0;
+  --road-case: #F6F8F5;
+  --study: #C6D3F5;
+  --study-hover: #AFC1F0;
+  --boundary: #5C6F9E;
+  --accent: #1F47D6;
+  --accent-ink: #FFFFFF;
+  --font-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D171C;
+    --surface: #14232A;
+    --land: #1A2B31;
+    --lake: #0B2535;
+    --lake-ink: #6E9AB0;
+    --ink: #E6EEEC;
+    --muted: #93A5AC;
+    --line: #2A3C44;
+    --road: #5D7882;
+    --road-case: #10202A;
+    --study: #25386E;
+    --study-hover: #2F4687;
+    --boundary: #8EA5E6;
+    --accent: #86A2FF;
+    --accent-ink: #0D171C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D171C;
+  --surface: #14232A;
+  --land: #1A2B31;
+  --lake: #0B2535;
+  --lake-ink: #6E9AB0;
+  --ink: #E6EEEC;
+  --muted: #93A5AC;
+  --line: #2A3C44;
+  --road: #5D7882;
+  --road-case: #10202A;
+  --study: #25386E;
+  --study-hover: #2F4687;
+  --boundary: #8EA5E6;
+  --accent: #86A2FF;
+  --accent-ink: #0D171C;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(2rem, 4.6vw, 3.3rem); line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 14px; text-wrap: balance; max-width: 22ch; }
+.abstract { margin: 0; max-width: 62ch; color: var(--muted); font-size: 1.05rem; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.mapcard { margin: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.mapcard svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.mapcap { padding: 12px 16px 14px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; font-size: 0.82rem; color: var(--ink); }
+.legend li { display: flex; align-items: center; gap: 7px; }
+.sw { width: 22px; height: 14px; border-radius: 2px; border: 1px solid var(--line); flex: none; }
+.sw.study { background: var(--study); border-color: var(--boundary); }
+.sw.sel { background: var(--accent); border-color: var(--accent); }
+.sw.land { background: var(--land); }
+.sw.water { background: var(--lake); }
+.sw.road { height: 0; border: 0; border-top: 3px solid var(--road); border-radius: 0; }
+.mapnote { margin: 0; font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.5; color: var(--muted); }
+
+/* Map drawing */
+.water { fill: var(--lake); }
+.landmass { fill: var(--land); stroke: var(--lake-ink); stroke-width: 1.5; stroke-linejoin: round; }
+.grat { stroke: var(--lake-ink); stroke-width: 0.8; stroke-dasharray: 2 6; opacity: 0.55; }
+.tick { font-family: var(--font-mono); font-size: 13px; fill: var(--muted); }
+.neat { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+.road-case { fill: none; stroke: var(--road-case); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.road-line { fill: none; stroke: var(--road); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.roadlbl { font-family: var(--font-mono); font-size: 11px; font-weight: 500; fill: var(--muted); letter-spacing: 0.04em; }
+.lakelbl { font-family: var(--font-display); font-weight: 600; font-size: 28px; letter-spacing: 0.4em; fill: var(--lake-ink); opacity: 0.8; }
+.ctx { font-family: var(--font-body); font-style: italic; font-size: 13px; fill: var(--muted); letter-spacing: 0.04em; text-anchor: middle; pointer-events: none; }
+.scale-bar rect { stroke: var(--ink); stroke-width: 1.2; }
+.scale-bar .a { fill: var(--ink); }
+.scale-bar .b { fill: var(--surface); }
+.scalelbl { font-family: var(--font-mono); font-size: 13px; fill: var(--ink); text-anchor: middle; }
+.northarrow path { fill: var(--ink); }
+.northarrow .hollow { fill: var(--surface); stroke: var(--ink); stroke-width: 1.2; }
+.northarrow text { font-family: var(--font-display); font-weight: 700; font-size: 20px; fill: var(--ink); text-anchor: middle; }
+
+.muni { fill: var(--study); stroke: var(--boundary); stroke-width: 1.6; stroke-linejoin: round; cursor: pointer; outline: none; transition: fill 0.12s; }
+.muni:hover { fill: var(--study-hover); }
+.muni:focus-visible { stroke: var(--accent); stroke-width: 4; }
+.muni.on { fill: var(--accent); stroke: var(--accent); }
+.mlbl { font-family: var(--font-body); font-weight: 600; font-size: 18px; fill: var(--ink); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--study); stroke-width: 5px; stroke-linejoin: round; }
+.mlbl.on { fill: var(--accent-ink); stroke: var(--accent); }
+@media (max-width: 640px) {
+  .ctx, .roadlbl, .tick { display: none; }
+  .mlbl { font-size: 30px; stroke-width: 7px; }
+  .lakelbl { font-size: 36px; }
+}
+
+/* Panel */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 22px; min-width: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .panel > * { animation: rise 0.22s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
+.panel h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.6rem, 3vw, 2.1rem); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 6px; text-wrap: balance; }
+.panel h2:focus { outline: none; }
+.panel h3 { font-family: var(--font-mono); font-weight: 500; font-size: 0.74rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
+.panel p { margin: 0; }
+.panel .lede { color: var(--muted); max-width: 52ch; margin-bottom: 18px; }
+.meta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 14px; }
+.pill { display: inline-block; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 10px; margin-bottom: 18px; }
+.block { padding-top: 16px; margin-top: 16px; border-top: 1px solid var(--line); }
+.block ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 6px; }
+.back { font: inherit; font-size: 0.9rem; font-weight: 500; color: var(--accent); background: none; border: 0; padding: 4px 0; margin: 0 0 14px; cursor: pointer; }
+.back:hover { text-decoration: underline; }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.list li + li { border-top: 1px solid var(--line); }
+.row { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font: inherit; color: var(--ink); background: none; border: 0; padding: 12px 4px; text-align: left; cursor: pointer; }
+.row:hover { background: var(--land); }
+.row .name { font-weight: 600; }
+.row .region { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); text-align: right; margin-left: auto; }
+.row::after { content: "\2192"; color: var(--accent); margin-left: 2px; }
+
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+footer { font-size: 0.82rem; color: var(--muted); max-width: 78ch; }
+
+arcgis-embedded-map { display: block; width: 100%; height: clamp(440px, 72vh, 700px); }
+.mapcap { padding: 10px 16px 12px; border-top: 1px solid var(--line); }
+.mapnote { margin: 0; font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.5; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">[Degree] thesis &middot; [University] &middot; [Year]</p>
+    <h1>Your Thesis Title Goes Here</h1>
+    <p class="abstract">Replace this with a one or two sentence abstract. Then choose a municipality to read the research carried out there.</p>
+  </header>
+
+  <main class="layout">
+    <figure class="mapcard">
+      <arcgis-embedded-map id="gta-map"
+        item-id="57bc712bc7f84a8fa9a0f22692f628d9"
+        theme="light"
+        center="-79.55088034872267,43.72153154658135"
+        scale="1155581.108577"
+        portal-url="https://www.arcgis.com"></arcgis-embedded-map>
+      <figcaption class="mapcap"><p class="mapnote">Interactive ArcGIS web map. Choose a municipality in the list and the map zooms to it.</p></figcaption>
+    </figure>
+
+    <aside id="panel" class="panel" aria-live="polite"></aside>
+  </main>
+
+  <footer>The map is an ArcGIS Online web map. It only shows for visitors if the web map and its layers are shared with Everyone (public).</footer>
+</div>
+<script>
+(function () {
+  var HOME = { center: "-79.55088034872267,43.72153154658135", scale: "1155581.108577" };
+
+  // Edit the text here. center is "longitude,latitude"; scale is the map scale to zoom to.
+  var DATA = [
+    { id: "burlington",  name: "Burlington",  region: "Halton Region",   center: "-79.81,43.38", scale: 180000 },
+    { id: "mississauga", name: "Mississauga", region: "Peel Region",     center: "-79.65,43.59", scale: 200000 },
+    { id: "vaughan",     name: "Vaughan",     region: "York Region",     center: "-79.54,43.83", scale: 200000 },
+    { id: "toronto",     name: "Toronto",     region: "City of Toronto", center: "-79.38,43.72", scale: 250000 },
+    { id: "markham",     name: "Markham",     region: "York Region",     center: "-79.30,43.87", scale: 200000 },
+    { id: "oshawa",      name: "Oshawa",      region: "Durham Region",   center: "-78.86,43.92", scale: 200000 }
+  ];
+  DATA.forEach(function (d) {
+    d.summary  = d.summary  || "Replace this with two or three sentences on what you studied in " + d.name + " and why it matters to the thesis.";
+    d.question = d.question || "State the research question you asked in " + d.name + ".";
+    d.method   = d.method   || "Describe how you collected and analysed data here, for example interviews, a survey, spatial analysis or document review.";
+    d.findings = d.findings || [
+      "First finding in " + d.name + ", with the evidence behind it.",
+      "Second finding in " + d.name + ".",
+      "Third finding in " + d.name + "."
+    ];
+    d.data     = d.data     || "Sample size: [n]  ·  Period: [dates]  ·  Sources: [list]";
+  });
+
+  var map = document.getElementById("gta-map");
+  var panel = document.getElementById("panel");
+
+  function setTheme() {
+    var root = document.documentElement.getAttribute("data-theme");
+    var dark = root ? root === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    map.setAttribute("theme", dark ? "dark" : "light");
+  }
+  setTheme();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", setTheme);
+
+  function moveTo(center, scale) {
+    try { map.setAttribute("center", center); map.setAttribute("scale", String(scale)); } catch (e) {}
+  }
+
+  function overview() {
+    var rows = DATA.map(function (d) {
+      return '<li><button class="row" type="button" data-go="' + d.id + '"><span class="name">' + d.name + '</span><span class="region">' + d.region + "</span></button></li>";
+    }).join("");
+    return '<h2 id="panel-title" tabindex="-1">Six municipalities, one region</h2>' +
+      '<p class="lede">Choose a municipality to read the research conducted there. The map zooms to it.</p>' +
+      '<ul class="list">' + rows + "</ul>";
+  }
+
+  function detail(d) {
+    var items = d.findings.map(function (f) { return "<li>" + f + "</li>"; }).join("");
+    return '<button class="back" type="button" data-back="1">← All municipalities</button>' +
+      '<h2 id="panel-title" tabindex="-1">' + d.name + "</h2>" +
+      '<div class="meta"><span>' + d.region + "</span></div>" +
+      '<span class="pill">Sample text, replace with yours</span>' +
+      '<p class="lede">' + d.summary + "</p>" +
+      '<section class="block"><h3>Research question</h3><p>' + d.question + "</p></section>" +
+      '<section class="block"><h3>Method</h3><p>' + d.method + "</p></section>" +
+      '<section class="block"><h3>Findings</h3><ul>' + items + "</ul></section>" +
+      '<section class="block"><h3>Data</h3><p>' + d.data + "</p></section>";
+  }
+
+  function select(id, fromUser) {
+    var d = DATA.filter(function (x) { return x.id === id; })[0];
+    panel.innerHTML = d ? detail(d) : overview();
+    if (fromUser) {
+      if (d) moveTo(d.center, d.scale); else moveTo(HOME.center, HOME.scale);
+      var title = document.getElementById("panel-title");
+      if (title) title.focus({ preventScroll: true });
+      if (window.matchMedia("(max-width: 960px)").matches) {
+        var calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        panel.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "start" });
+      }
+    }
+  }
+
+  panel.addEventListener("click", function (e) {
+    var go = e.target.closest("[data-go]");
+    if (go) { select(go.getAttribute("data-go"), true); return; }
+    if (e.target.closest("[data-back]")) select(null, true);
+  });
+
+  var start = (location.hash || "").replace("#", "");
+  select(DATA.some(function (x) { return x.id === start; }) ? start : null, false);
+})();
+</script>
+</body>
+</html>
